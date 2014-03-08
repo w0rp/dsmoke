@@ -3,7 +3,7 @@
 This is a library for using
 [SMOKE](http://techbase.kde.org/Development/Languages/Smoke)
 from D. This offers functionality for reading and interacting with SMOKE
-libraries for executing C++ code through D and for geneating D libraries from
+libraries for executing C++ code through D and for generating D libraries from
 generated SMOKE libraries.
 
 ## Quick Start
