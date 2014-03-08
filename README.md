@@ -19,7 +19,7 @@ than the D standard library. Libraries which link DSMOKE **will** have to link
 the relevant SMOKE libraries they wish to use however, and likely the C++
 standard library also.
 
-## A Direct D Interface to SMOKE.
+## A Direct D Interface to SMOKE
 
 This library contains a module ```smoke.smoke```, which provides an interface
 to the SMOKE data as it is specified in C++. The C++ data structure is actually
@@ -31,7 +31,7 @@ The module also provides an ```extern(C++)``` interface to a ```SmokeBinding```
 class, which is needed for handling virtual method calls and deletions in D
 SMOKE wrapper libraries.
 
-## Some Library Declarations Out of the Box.
+## Some Library Declarations Out of the Box
 
 DSMOKE is pretty useless if there aren't any SMOKE libraries out there. DSMOKE
 provides some function declarations for you out of the box so you can get
@@ -49,7 +49,7 @@ structure is created by copying data out of the SMOKE library through the
 For example, you can get everything you need to know about QtCore and QtGUI
 like so.
 
-```
+```D
 // Link this file with smokebase, smokeqtcore, smokeqtgui, etc.
 
 // Import the Smoke data structure
@@ -95,7 +95,7 @@ object which can be used for this purpose in the module
 object and lets you insert some configuration options and delegates for
 tweaking the output.
 
-```
+```D
 // Import this too so we can generate code.
 import smoke.smoke_generator;
 
