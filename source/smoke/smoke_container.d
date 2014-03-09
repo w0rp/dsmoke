@@ -118,6 +118,13 @@ public:
                 }
             }
 
+            import std.algorithm: startsWith;
+
+            // Remove the volatile keyword from the front of the type.
+            if (_typeString.startsWith("volatile ")) {
+                front += "volatile ".length;
+            }
+
             return _typeString[front .. end];
         }
 
@@ -212,6 +219,7 @@ public:
                 "primtiveTypeString called for non primitive!"
             );
 
+            // Try matching the string first, it's more reliable.
             switch (unqualifiedTypeString) {
             case "void":
                 return "void";
@@ -228,9 +236,11 @@ public:
             case "unsigned short":
                 return "ushort";
             case "int":
+            case "volatile int":
                 return "int";
             case "unsigned":
             case "unsigned int":
+            case "volatile unsigned int":
                 return "uint";
             case "long":
                 return "c_long";
@@ -253,7 +263,33 @@ public:
             case "bool":
                 return "bool";
             default:
-                assert(0, "Unhandled C++ type: " ~ unqualifiedTypeString);
+                // Fall back on the type ID if that fails.
+                with(Smoke.TypeId) switch (typeID) {
+                case t_bool:
+                    return "bool";
+                case t_char:
+                    return "byte";
+                case t_uchar:
+                    return "ubyte";
+                case t_short:
+                    return "short";
+                case t_ushort:
+                    return "ushort";
+                case t_int:
+                    return "int";
+                case t_uint:
+                    return "uint";
+                case t_long:
+                    return "c_long";
+                case t_ulong:
+                    return "c_ulong";
+                case t_float:
+                    return "float";
+                case t_double:
+                    return "double";
+                default:
+                    assert(0, "Unhandled C++ type: " ~ unqualifiedTypeString);
+                }
             }
         }
 
@@ -780,18 +816,7 @@ private:
 
         @safe pure nothrow
         bool isReallyPrimitive(const(Type) type) {
-            with(Smoke.TypeId) switch (type.typeID) {
-            case t_enum:
-            case t_class:
-            case t_last:
-                return false;
-            default:
-            }
-
-            // Okay, so SMOKE is telling us it's supposed to be
-            // a primitive type. This can be a complete lie, so let's check.
-            // We'll use the version of the type string without any pointers,
-            // references, etc.
+            // Check the string first, it can be more reliable.
             switch (type.unqualifiedTypeString) {
             // Some of these are probably never used, but who knows?
             case "void":
@@ -816,7 +841,23 @@ private:
             case "wchar_t":
                 return true;
             default:
-                return false;
+                // Fall back on the type ID if that fails.
+                with(Smoke.TypeId) switch (type.typeID) {
+                case t_bool:
+                case t_char:
+                case t_uchar:
+                case t_short:
+                case t_ushort:
+                case t_int:
+                case t_uint:
+                case t_long:
+                case t_ulong:
+                case t_float:
+                case t_double:
+                    return true;
+                default:
+                    return false;
+                }
             }
         }
 
@@ -906,6 +947,13 @@ private:
             }
 
             foreach(_1, cls; metadata._classMap) {
+                if (cls.name.length == 0) {
+                    // Get rid of any classes with blank names.
+                    // This can happen for some reason in SMOKE data
+                    // and it will break builds.
+                    continue;
+                }
+
                 string namespace = namespaceForName(cls.name);
 
                 if (namespace.length > 0) {
@@ -949,6 +997,12 @@ private:
             }
 
             foreach(_1, enm; metadata._enumMap) {
+                if (enm.name == "long") {
+                    // TODO: This is a special enum, and its values need
+                    // loading into global variables instead.
+                    continue;
+                }
+
                 string namespace = namespaceForName(enm.name);
 
                 if (namespace.length > 0) {

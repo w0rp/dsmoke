@@ -16,7 +16,6 @@ private alias Class = immutable(SmokeContainer.Class);
 private alias Enum = immutable(SmokeContainer.Enum);
 private alias Method = immutable(SmokeContainer.Method);
 
-
 /**
  * Stored in a maximum of 128-bits of space,
  * this object represents an array of bits up to a maximum of 64 bits.
@@ -191,6 +190,14 @@ private string topNameD(string qualifiedName) {
     return qualifiedName.split(".")[0];
 }
 
+/// Flags for cleaning a build directory.
+enum CleanBuildDirectory {
+    /// Do not clean the build directory.
+    no,
+    /// Clean the build directory.
+    yes
+}
+
 /**
  * A SMOKE generator. Requiring input from a SmokeContainer and some
  * additional customisation, including external source files for adding
@@ -199,27 +206,21 @@ private string topNameD(string qualifiedName) {
  * for C++ libraries in this manner.
  */
 struct SmokeGenerator {
-private:
-    string _moduleName;
-    string _sourceDirectory;
-    string _loaderName = "smokeLoader";
-public:
-    alias Type = immutable(SmokeContainer.Type);
-    alias Class = immutable(SmokeContainer.Class);
-    alias Enum = immutable(SmokeContainer.Enum);
-    alias Method = immutable(SmokeContainer.Method);
+    private string _moduleName;
+    private string _sourceDirectory;
+    private string _loaderName = "smokeLoader";
 
     /**
      *
      */
-    string delegate(Type type) basicDTypeFunc;
+    public string delegate(Type type) basicDTypeFunc;
 
     /**
      * This delegate will be called if set to blacklist types.
      *
      * No methods will be generated which mention a blacklisted type.
      */
-    bool delegate(Type type) blackListFunc;
+    public bool delegate(Type type) blackListFunc;
 
     /**
      * This delegate will be called if set to blacklist classes.
@@ -230,7 +231,7 @@ public:
      *
      * This should only be used when SMOKE just generates rubbish for a class.
      */
-    bool delegate(Class cls) classBlackListFunc;
+    public bool delegate(Class cls) classBlackListFunc;
 
     /**
      * This delegate will be called if set to generate the names
@@ -245,7 +246,7 @@ public:
      *
      * The wrapper should return an empty string to ignore the type.
      */
-    string delegate(Type type) inputWrapperFunc;
+    public string delegate(Type type) inputWrapperFunc;
 
     /**
      * This delegate will be called if set to generate the names
@@ -256,9 +257,9 @@ public:
      *
      * The wrapper should return an empty string to ignore the type.
      */
-    string delegate(Type type) outputWrapperFunc;
+    public string delegate(Type type) outputWrapperFunc;
 
-    bool delegate(Type type) importBlacklistFunc;
+    public bool delegate(Type type) importBlacklistFunc;
 private:
     enum RemoveRef : bool { no, yes }
 
@@ -301,8 +302,10 @@ private:
         file.write(" {\n");
 
         if (cls.parentClassList.length > 1) {
+            /*
             writefln("`%s` has more than one parent class and we only "
                 ~ "picked the first one! That 'aint right!", cls.name);
+            */
         }
     }
 
@@ -436,9 +439,13 @@ private:
         case "ulong":
         case "unittest":
         case "ushort":
+        case "string":
+        case "wstring":
+        case "dstring":
         case "version":
         case "volatile":
         case "with":
+        case "ref":
             // Write a trailing underscore for method names which are also
             // D keywords.
             file.write('_');
@@ -1097,7 +1104,6 @@ private:
         // Import smoke types, as they will be needed.
         file.write("import smoke.smoke;\n");
         file.write("import smoke.smoke_util;\n");
-        file.write("import smoke.smoke_cwrapper;\n");
         // Write the module prefix import line.
         file.writef("import %s.prefix;\n", _moduleName);
         file.writef(
@@ -1224,18 +1230,29 @@ public:
      * Params:
      *     container = A SmokeContainer containing SMOKE data.
      *     directory = A directory to write the source files to.
+     *     cleanBuildDirectory = Controls whether or not the build
+     *         directory should be cleaned before building.
      */
     @trusted
-    void writeToDirectory
-    (immutable(SmokeContainer) container, string directory) const {
+    void writeToDirectory(immutable(SmokeContainer) container,
+    string directory,
+    CleanBuildDirectory cleanBuildDirectory = CleanBuildDirectory.no
+    ) const {
         enforce(basicDTypeFunc !is null, "You must set basicDTypeFunc!");
         enforce(_moduleName.length > 0, "You must set moduleName!");
         enforce(_sourceDirectory.length > 0, "You must set sourceDirectory!");
+
         enforce(exists(_sourceDirectory) && isDir(_sourceDirectory),
             "sourceDirectory does not point to a valid directory!");
 
         if (!exists(directory)) {
             mkdir(directory);
+        } else if (cleanBuildDirectory) {
+            foreach(entry; dirEntries(directory, SpanMode.shallow)) {
+                if (!isDir(entry)) {
+                    remove(entry);
+                }
+            }
         }
 
         string staticFilenameForTypename(string name) {
@@ -1249,6 +1266,10 @@ public:
         foreach(cls; container.topLevelClassList) {
             if (isBlacklisted(cls)) {
                 continue;
+            }
+
+            if (cls.name.length == 0) {
+                writeln("There was a blank class name in here!");
             }
 
             File file = File(staticFilenameForTypename(cls.name), "w");
@@ -1288,11 +1309,16 @@ public:
             writeEnum(file, enm, 0);
         }
 
-        // Copy .d files to the output directory from the source directory.
-        foreach(inName; dirEntries(_sourceDirectory, "*.d", SpanMode.shallow)) {
-            if (isFile(inName)) {
-                copy(inName, buildPath(directory, baseName(inName)));
+        foreach(entry; dirEntries(_sourceDirectory, SpanMode.shallow)) {
+            if (isFile(entry)
+            && entry.name.endsWith(".d") || entry.name.endsWith(".cpp")) {
+                copy(entry, buildPath(directory, baseName(entry)));
             }
         }
     }
+
+    alias Type = immutable(SmokeContainer.Type);
+    alias Class = immutable(SmokeContainer.Class);
+    alias Enum = immutable(SmokeContainer.Enum);
+    alias Method = immutable(SmokeContainer.Method);
 }
