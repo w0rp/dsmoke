@@ -8,5 +8,9 @@
     "license": "BSD 2-clause",
     "copyright": "Copyright © 2014, w0rp",
     "dependencies": {
+        "dstruct": {
+            "version": "~master",
+            "path": "../dstruct"
+        }
     }
 }

@@ -8,14 +8,14 @@ generated SMOKE libraries.
 
 ## Quick Start
 
-Check out the code somewhere, and use DUB to build the library.
+Check out the code somewhere, with the *dstruct* code in the same parent directory if you don't have it and use DUB to build the library.
 
 ```
 dub build
 ```
 
-That's it. This library itself doesn't actually depend on any libraries other
-than the D standard library. Libraries which link DSMOKE **will** have to link
+That's it. This library itself doesn't actually depend on SMOKE or any
+SMOKE libraries itself. Libraries which link DSMOKE **will** have to link
 the relevant SMOKE libraries they wish to use however, and likely the C++
 standard library also.
 

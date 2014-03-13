@@ -5,10 +5,11 @@ import std.array;
 import std.typecons;
 import std.stdio;
 
+import dstruct.weak_reference;
+
 import smoke.smoke;
 import smoke.smoke_util;
 import smoke.string_util;
-import smoke.weak_reference;
 
 pure @safe nothrow
 private ref V1 setDefault(K, V1, V2)(ref V1[K] map, K key, lazy V2 def)

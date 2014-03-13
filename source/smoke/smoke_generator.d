@@ -8,6 +8,8 @@ import std.array;
 import std.algorithm;
 import std.range;
 
+import dstruct.set;
+
 import smoke.smoke_container;
 import smoke.string_util;
 
@@ -206,62 +208,22 @@ enum CleanBuildDirectory {
  * for C++ libraries in this manner.
  */
 struct SmokeGenerator {
-    private string _moduleName;
-    private string _sourceDirectory;
-    private string _loaderName = "smokeLoader";
-
-    /**
-     *
-     */
-    public string delegate(Type type) basicDTypeFunc;
-
-    /**
-     * This delegate will be called if set to blacklist types.
-     *
-     * No methods will be generated which mention a blacklisted type.
-     */
-    public bool delegate(Type type) blackListFunc;
-
-    /**
-     * This delegate will be called if set to blacklist classes.
-     *
-     * If this delegate returns true for a class, the class will no be
-     * generated, subclasses will not be generated, methods with the class
-     * mentioned in arguments will not be generated, etc.
-     *
-     * This should only be used when SMOKE just generates rubbish for a class.
-     */
-    public bool delegate(Class cls) classBlackListFunc;
-
-    /**
-     * This delegate will be called if set to generate the names
-     * of wrapper functions to use for passing types to C++. The input
-     * wrapper function will take the type as it is specified in the
-     * argument list of a method.
-     *
-     * The wrapper function should probably be defined in the prefix.d file.
-     *
-     * The result of calling the wrapper function must contain a property
-     * ._data for accessing some data to pass to C++.
-     *
-     * The wrapper should return an empty string to ignore the type.
-     */
-    public string delegate(Type type) inputWrapperFunc;
-
-    /**
-     * This delegate will be called if set to generate the names
-     * of wrapper functions to use for converting types from a
-     * Smoke.StackItem to some D type.
-     *
-     * The wrapper function should probably be defined in the prefix.d file.
-     *
-     * The wrapper should return an empty string to ignore the type.
-     */
-    public string delegate(Type type) outputWrapperFunc;
-
-    public bool delegate(Type type) importBlacklistFunc;
 private:
     enum RemoveRef : bool { no, yes }
+
+    string _moduleName;
+    string _loaderName;
+    string[Type] _basicDTypeMap;
+    HashSet!Type _blacklistSet;
+    HashSet!Class _classBlacklistSet;
+    HashSet!Type _importBlacklistSet;
+    string[Type] _inputWrapperMap;
+    string[Type] _outputWrapperMap;
+    immutable(SmokeContainer) _smokeContainer;
+
+    this(immutable(SmokeContainer) container) {
+        _smokeContainer = container;
+    }
 
     void writeIndent(ref File file, int size) const {
         if (size == 0) {
@@ -371,7 +333,7 @@ private:
         if (type.isPrimitive) {
             file.write(type.primitiveTypeString);
         } else {
-            file.write(basicDTypeFunc(type));
+            file.write(_basicDTypeMap[type]);
         }
 
         if (type.isConst && !type.isPrimitive) {
@@ -1037,7 +999,7 @@ private:
     }
 
     void writeImports(ref File file, Class cls) const {
-        bool[string] nameSet;
+        HashSet!string nameSet;
 
         void considerType(Type type) {
             if (type.isPrimitive) {
@@ -1049,8 +1011,7 @@ private:
             }
 
             // Add this one to the set.
-            string name = topNameD(basicDTypeFunc(type));
-            nameSet[name] = true;
+            nameSet.add(topNameD(_basicDTypeMap[type]));
         }
 
         void searchForTypesInMethod(Method method) {
@@ -1074,8 +1035,7 @@ private:
 
             foreach(parentClass; cls.parentClassList) {
                 // Add this one to the set.
-                string name = topNameD(parentClass.name);
-                nameSet[name] = true;
+                nameSet.add(topNameD(parentClass.name));
             }
 
             foreach(nestedClass; cls.nestedClassList) {
@@ -1112,7 +1072,7 @@ private:
             cls.name.toLowerASCII
         );
 
-        foreach(name, _; nameSet) {
+        foreach(name; nameSet) {
             file.writef("import %s.%s;\n", _moduleName, name.toLowerASCII);
         }
 
@@ -1121,24 +1081,30 @@ private:
         }
     }
 
+    @safe pure nothrow
     string inputWrapper(Type type) const {
-        if (inputWrapperFunc) {
-            return inputWrapperFunc(type);
+        auto strPtr = type in _inputWrapperMap;
+
+        if (strPtr) {
+            return *strPtr;
         }
 
         return "";
     }
 
+    @safe pure nothrow
     string outputWrapper(Type type) const {
-        if (outputWrapperFunc) {
-            return outputWrapperFunc(type);
+        auto strPtr = type in _outputWrapperMap;
+
+        if (strPtr) {
+            return *strPtr;
         }
 
         return "";
     }
 
     bool isBlacklisted(Class cls) const {
-        if (classBlackListFunc !is null && classBlackListFunc(cls)) {
+        if (cls in _classBlacklistSet) {
             return true;
         }
 
@@ -1177,74 +1143,39 @@ private:
             return true;
         }
 
-        return blackListFunc !is null && blackListFunc(type);
+        return type in _blacklistSet;
     }
 
+    @safe pure nothrow
     bool isImportBlacklisted(Type type) const {
-        return importBlacklistFunc !is null && importBlacklistFunc(type);
+        return type in _importBlacklistSet;
     }
 
     void writeModuleLine(ref File file, string baseName) const {
         file.writef("module %s.%s;\n\n", _moduleName, baseName);
     }
 public:
-    /**
-     * Returns: The module name currently set for this generator.
-     */
-    @safe pure
-    @property
-    void moduleName(string name) {
-        // TODO: Check format of name with regex here.
+    /// Default init for this object does not make sense.
+    @disable this();
 
-        _moduleName = name;
-    }
+    /// This object is non-copyable.
+    @disable this(this);
 
     /**
-     * Set the module name for this generator.
-     *
-     * Before generating source files, this value must be set, as it
-     * will be used as the module name for all generated files.
-     */
-    @safe pure nothrow
-    @property
-    string moduleName() const {
-        return _moduleName;
-    }
-
-    @safe pure
-    @property
-    void sourceDirectory(string value) {
-        _sourceDirectory = value;
-    }
-
-    @safe pure nothrow
-    @property
-    string sourceDirectory() const {
-        return _sourceDirectory;
-    }
-
-    /**
-     * Given some SmokeContainer data, generate D source files in a given
-     * directory.
+     * Output the generated D source files to a given directory, copying
+     * some files from a given source directory over top of the generated
+     * output.
      *
      * Params:
-     *     container = A SmokeContainer containing SMOKE data.
+     *     sourceDirectory = A directory to copy additional files from.
      *     directory = A directory to write the source files to.
      *     cleanBuildDirectory = Controls whether or not the build
      *         directory should be cleaned before building.
      */
     @trusted
-    void writeToDirectory(immutable(SmokeContainer) container,
-    string directory,
+    void writeToDirectory(string sourceDirectory, string directory,
     CleanBuildDirectory cleanBuildDirectory = CleanBuildDirectory.no
     ) const {
-        enforce(basicDTypeFunc !is null, "You must set basicDTypeFunc!");
-        enforce(_moduleName.length > 0, "You must set moduleName!");
-        enforce(_sourceDirectory.length > 0, "You must set sourceDirectory!");
-
-        enforce(exists(_sourceDirectory) && isDir(_sourceDirectory),
-            "sourceDirectory does not point to a valid directory!");
-
         if (!exists(directory)) {
             mkdir(directory);
         } else if (cleanBuildDirectory) {
@@ -1263,7 +1194,7 @@ public:
             return buildPath(directory, name.toLowerASCII ~ ".d");
         }
 
-        foreach(cls; container.topLevelClassList) {
+        foreach(cls; _smokeContainer.topLevelClassList) {
             if (isBlacklisted(cls)) {
                 continue;
             }
@@ -1289,7 +1220,7 @@ public:
             file.write('}');
         }
 
-        foreach(cls; container.topLevelClassList) {
+        foreach(cls; _smokeContainer.topLevelClassList) {
             if (isBlacklisted(cls)) {
                 continue;
             }
@@ -1302,14 +1233,14 @@ public:
             writeClass(file, cls, 0);
         }
 
-        foreach(enm; container.topLevelEnumList) {
+        foreach(enm; _smokeContainer.topLevelEnumList) {
             File file = File(filenameForTypename(enm.name), "w");
             writeModuleLine(file, file.name.baseName.stripExtension);
 
             writeEnum(file, enm, 0);
         }
 
-        foreach(entry; dirEntries(_sourceDirectory, SpanMode.shallow)) {
+        foreach(entry; dirEntries(sourceDirectory, SpanMode.shallow)) {
             if (isFile(entry)
             && entry.name.endsWith(".d") || entry.name.endsWith(".cpp")) {
                 copy(entry, buildPath(directory, baseName(entry)));
@@ -1321,4 +1252,167 @@ public:
     alias Class = immutable(SmokeContainer.Class);
     alias Enum = immutable(SmokeContainer.Enum);
     alias Method = immutable(SmokeContainer.Method);
+}
+
+struct SmokeGeneratorBuilder {
+    private string _moduleName;
+    private string _loaderName = "smokeLoader";
+
+    /**
+     * This delegate will be called if set to produce a mapping from
+     * from types to strings as they should be written in D.
+     */
+    string delegate(Type type) basicDTypeFunc;
+
+    /**
+     * This delegate will be called if set to blacklist types.
+     *
+     * No methods will be generated which mention a blacklisted type.
+     */
+    bool delegate(Type type) blacklistFunc;
+
+    /**
+     * This delegate will be called if set to blacklist classes.
+     *
+     * If this delegate returns true for a class, the class will no be
+     * generated, subclasses will not be generated, methods with the class
+     * mentioned in arguments will not be generated, etc.
+     *
+     * This should only be used when SMOKE just generates rubbish for a class.
+     */
+    bool delegate(Class cls) classBlacklistFunc;
+
+    /**
+     * This delegate will be called if set to generate the names
+     * of wrapper functions to use for passing types to C++. The input
+     * wrapper function will take the type as it is specified in the
+     * argument list of a method.
+     *
+     * The wrapper function should probably be defined in the prefix.d file.
+     *
+     * The result of calling the wrapper function must contain a property
+     * ._data for accessing some data to pass to C++.
+     *
+     * The wrapper should return an empty string to ignore the type.
+     */
+    string delegate(Type type) inputWrapperFunc;
+
+    /**
+     * This delegate will be called if set to generate the names
+     * of wrapper functions to use for converting types from a
+     * Smoke.StackItem to some D type.
+     *
+     * The wrapper function should probably be defined in the prefix.d file.
+     *
+     * The wrapper should return an empty string to ignore the type.
+     */
+    string delegate(Type type) outputWrapperFunc;
+
+    /**
+     * This delegate will be called if set to exclude types from having
+     * imports lines written for them. The generated code will then
+     * be responsible for dealing with the types in some other way,
+     * perhaps by replacing them with native D types and custom wrappers.
+     */
+    bool delegate(Type type) importBlacklistFunc;
+
+    /**
+     * Returns: The module name currently set for this generator.
+     */
+    @safe pure
+    @property
+    void moduleName(string name) {
+        // TODO: Check format of name with regex here.
+
+        _moduleName = name;
+    }
+
+    /**
+     * Set the module name for this generator.
+     *
+     * Before generating source files, this value must be set, as it
+     * will be used as the module name for all generated files.
+     */
+    @safe pure nothrow
+    @property
+    string moduleName() const {
+        return _moduleName;
+    }
+
+    /**
+     * Given options previously set and a series of delegates for
+     * customising generator output, run all of the delegates and
+     * construct a SmokeGenerator.
+     *
+     * Params:
+     *     container = A SmokeContainer with data to generate output from.
+     */
+    immutable(SmokeGenerator) buildGenerator(
+        immutable(SmokeContainer) container
+    ) in {
+        assert(container !is null);
+    } body {
+        enforce(basicDTypeFunc !is null, "You must set basicDTypeFunc!");
+        enforce(_moduleName.length > 0, "You must set moduleName!");
+
+        auto generator = SmokeGenerator(container);
+
+        // Copy over the most basic of things.
+        generator._moduleName = _moduleName;
+        generator._loaderName = _loaderName;
+
+        // Run through every type and execute our delegates to customise things
+        // we will then take the output of those delegates and put them
+        // in our immutable object.
+        foreach(type; container.allTypesList) {
+            generator._basicDTypeMap[type] = basicDTypeFunc(type);
+
+            if (blacklistFunc !is null && blacklistFunc(type)) {
+                generator._blacklistSet.add(type);
+            }
+
+            if (inputWrapperFunc !is null) {
+                string wrapperName = inputWrapperFunc(type);
+
+                if (wrapperName.length > 0) {
+                    generator._inputWrapperMap[type] = wrapperName;
+                }
+            }
+
+            if (outputWrapperFunc !is null) {
+                string wrapperName = outputWrapperFunc(type);
+
+                if (wrapperName.length > 0) {
+                    generator._outputWrapperMap[type] = wrapperName;
+                }
+            }
+
+            if (importBlacklistFunc !is null && importBlacklistFunc(type)) {
+                generator._importBlacklistSet.add(type);
+            }
+        }
+
+        // Now we need to run through every class and do something similar
+        // to what we did for our types.
+
+        void setupClass(Class cls) {
+            if (classBlacklistFunc !is null && classBlacklistFunc(cls)) {
+                generator._classBlacklistSet.add(cls);
+            }
+        }
+
+        void setupClassAndNested(Class cls) {
+            setupClass(cls);
+
+            foreach(nestedClass; cls.nestedClassList) {
+                setupClassAndNested(nestedClass);
+            }
+        }
+
+        foreach(cls; container.topLevelClassList) {
+            setupClassAndNested(cls);
+        }
+
+        return cast(immutable) generator;
+    }
 }

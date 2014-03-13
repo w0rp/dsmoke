@@ -5,6 +5,8 @@ import std.array;
 import std.exception;
 import std.functional;
 
+import dstruct.set;
+
 import smoke.smoke;
 import smoke.smoke_util;
 import smoke.string_util : toSlice;
@@ -664,6 +666,7 @@ private:
 
     Class[] _topLevelClassList;
     Enum[] _topLevelEnumList;
+    Type[] _allTypesList;
     SmokeMetadata[Smoke*] _metadataMap;
 
     @trusted pure
@@ -792,7 +795,6 @@ private:
         Class[string] namedClassMap;
         Enum[string] namedEnumMap;
         Method[][string][Class] classMethodMap;
-        bool[Type] checkedTypes;
         bool[Class] abstractCache;
 
         @safe nothrow
@@ -863,7 +865,7 @@ private:
 
         @safe nothrow
         void setFinalMethodFlags
-        (Method method, ref bool[Method] redundantSet) {
+        (Method method, ref HashSet!Method redundantSet) {
             if (method._cls._parentClassList.length == 0) {
                 return;
             }
@@ -897,7 +899,7 @@ private:
                     if (!otherMethod.isVirtual) {
                         // This is supposed to be an override of a non-virtual
                         // method, so that's nonsense. Get rid of it later.
-                        redundantSet[method] = true;
+                        redundantSet.add(method);
                     }
 
                     // We got this far, it's definitely a match.
@@ -937,12 +939,7 @@ private:
             // Run through types to set the isPrimitive flag.
             // We have to do this because the enum
             foreach(_1, type; metadata._typeMap) {
-                if (type in checkedTypes) {
-                    continue;
-                }
-
-                checkedTypes[type] = true;
-
+                _allTypesList ~= type;
                 type._isPrimitive = isReallyPrimitive(type);
             }
 
@@ -964,7 +961,7 @@ private:
                     _topLevelClassList ~= cls;
                 }
 
-                bool[Method] redundantSet = null;
+                HashSet!Method redundantSet;
 
                 foreach(method; cls._methodList) {
                     setFinalMethodFlags(method, redundantSet);
@@ -1033,5 +1030,13 @@ public:
     @safe pure nothrow
     @property inout(Enum[]) topLevelEnumList() inout {
         return _topLevelEnumList;
+    }
+
+    /**
+     * Returns: A distinct list of every type known by this container.
+     */
+    @safe pure nothrow
+    @property inout(Type[]) allTypesList() inout {
+        return _allTypesList;
     }
 }
