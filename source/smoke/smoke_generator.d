@@ -7,6 +7,7 @@ import std.file;
 import std.array;
 import std.algorithm;
 import std.range;
+import std.parallelism;
 
 import dstruct.set;
 
@@ -1220,11 +1221,14 @@ public:
             file.write('}');
         }
 
-        foreach(cls; _smokeContainer.topLevelClassList) {
-            if (isBlacklisted(cls)) {
-                continue;
-            }
+        // Testing pool sizes in stages of sizes of 10 revealed that
+        // a work unit size of 20 achieves decent results.
+        enum workUnitSize = 20;
 
+        auto classRange = _smokeContainer.topLevelClassList
+            .filter!(x => !isBlacklisted(x));
+
+        foreach(cls; taskPool.parallel(classRange, workUnitSize)) {
             File file = File(filenameForTypename(cls.name), "w");
             writeModuleLine(file, file.name.baseName.stripExtension);
 
@@ -1233,12 +1237,17 @@ public:
             writeClass(file, cls, 0);
         }
 
-        foreach(enm; _smokeContainer.topLevelEnumList) {
+        auto enumRange = _smokeContainer.topLevelEnumList;
+
+        foreach(enm; taskPool.parallel(enumRange, workUnitSize)) {
             File file = File(filenameForTypename(enm.name), "w");
             writeModuleLine(file, file.name.baseName.stripExtension);
 
             writeEnum(file, enm, 0);
         }
+
+        // Block for parallel tasks to complete.
+        taskPool.finish(true);
 
         foreach(entry; dirEntries(sourceDirectory, SpanMode.shallow)) {
             if (isFile(entry)
