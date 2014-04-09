@@ -59,7 +59,7 @@ public:
 
         container.finalize();
 
-        return container;
+        return cast(immutable) container;
     }
 
     /**
