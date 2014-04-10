@@ -71,6 +71,7 @@ public:
         Smoke.TypeFlags _flags;
         Class _cls;
         bool _isPrimitive;
+        bool _isReference;
 
         @safe pure nothrow
         this(string typeString, Smoke.TypeFlags flags, Class cls) {
@@ -180,7 +181,7 @@ public:
          */
         @safe pure nothrow
         @property bool isReference() inout {
-            return (_flags & Smoke.TypeFlags.tf_ref) != 0;
+            return _isReference;
         }
 
         /**
@@ -936,11 +937,20 @@ private:
 
         // Now we have everything, run again to build a nested structure.
         foreach(_0, metadata; _metadataMap) {
-            // Run through types to set the isPrimitive flag.
-            // We have to do this because the enum
             foreach(_1, type; metadata._typeMap) {
                 _allTypesList ~= type;
+
+                // Set the isPrimitive flag based on some analysis.
+                // We have to do this because the enum flags can be wrong.
                 type._isPrimitive = isReallyPrimitive(type);
+
+                import std.algorithm : countUntil;
+
+                // Determine that a type is a reference type
+                // by searching the type for a '&'
+                //
+                // This must be done because the enum flag can be wrong.
+                type._isReference = type._typeString.countUntil('&') >= 0;
             }
 
             foreach(_1, cls; metadata._classMap) {
