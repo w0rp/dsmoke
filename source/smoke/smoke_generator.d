@@ -325,9 +325,7 @@ private:
             file.write("ref ");
         }
 
-        // We won't write const() for primitive types, to make things
-        // simpler.
-        if (type.isConst && !type.isPrimitive) {
+        if (type.isConst) {
             file.write("const(");
         }
 
@@ -337,7 +335,7 @@ private:
             file.write(_basicDTypeMap[type]);
         }
 
-        if (type.isConst && !type.isPrimitive) {
+        if (type.isConst) {
             file.write(")");
         }
 
