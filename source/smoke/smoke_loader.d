@@ -6,24 +6,11 @@ import std.typecons;
 import std.stdio;
 
 import dstruct.weak_reference;
+import dstruct.map;
 
 import smoke.smoke;
 import smoke.smoke_util;
 import smoke.string_util;
-
-pure @safe nothrow
-private ref V1 setDefault(K, V1, V2)(ref V1[K] map, K key, lazy V2 def)
-if (is(V2 : V1)) {
-    V1* valPtr = key in map;
-
-    if (valPtr != null) {
-        return *valPtr;
-    }
-
-    map[key] = def();
-
-    return map[key];
-}
 
 private extern(C++) class SmokeClassBinding : SmokeBinding {
     ClassLoader _loader;
@@ -87,7 +74,7 @@ private:
 
     pure @safe nothrow
     void addMethod(string methodName, const(Smoke.Method*) method) {
-        _overloadedMethodMap.setDefault(methodName, null) ~= method;
+        _overloadedMethodMap.setDefault(methodName) ~= method;
     }
 
     pure @safe nothrow

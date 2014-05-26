@@ -5,6 +5,7 @@ import std.array;
 import std.exception;
 import std.functional;
 
+import dstruct.support;
 import dstruct.set;
 
 import smoke.smoke;
@@ -65,16 +66,16 @@ public:
     /**
      * This class is a D representation of a type in C++, taken from Smoke.
      */
-    class Type {
+    struct Type {
     private:
         string _typeString;
         Smoke.TypeFlags _flags;
-        Class _cls;
+        Class* _cls;
         bool _isPrimitive;
         bool _isReference;
 
         @safe pure nothrow
-        this(string typeString, Smoke.TypeFlags flags, Class cls) {
+        this(string typeString, Smoke.TypeFlags flags, Class* cls) {
             _typeString = typeString;
             _flags = flags;
             _cls = cls;
@@ -135,7 +136,7 @@ public:
          * Returns: The class associated with this type, null if no class.
          */
         @safe pure nothrow
-        @property inout(Class) cls() inout {
+        @property inout(Class*) cls() inout {
             return _cls;
         }
 
@@ -350,17 +351,14 @@ public:
     /**
      * This class is a representation of a C++ method, taken from Smoke.
      */
-    class Method {
+    struct Method {
     private:
         string _name;
-        Class _cls;
-        Type _returnType;
-        Type[] _argumentTypeList;
+        Class* _cls;
+        Type* _returnType;
+        Type*[] _argumentTypeList;
         Smoke.MethodFlags _flags;
         bool _isOverride;
-
-        @safe pure nothrow
-        this() {}
     public:
         /**
          * Returns: true if this method is an override.
@@ -382,7 +380,7 @@ public:
          * Returns: The class object for this method. null if no class.
          */
         @safe pure nothrow
-        @property inout(Class) cls() inout {
+        @property inout(Class*) cls() inout {
             return _cls;
         }
 
@@ -390,7 +388,7 @@ public:
          * Returns: The return type for this method.
          */
         @safe pure nothrow
-        @property inout(Type) returnType() inout {
+        @property inout(Type*) returnType() inout {
             return _returnType;
         }
 
@@ -399,7 +397,7 @@ public:
          *   which may be empty.
          */
         @safe pure nothrow
-        @property inout(Type[]) argumentTypeList() inout {
+        @property inout(Type*[]) argumentTypeList() inout {
             return _argumentTypeList;
         }
 
@@ -502,17 +500,14 @@ public:
     /**
      * This class is a representation of a C++ class, taken from Smoke.
      */
-    class Class {
+    struct Class {
     private:
-        Class[] _parentClassList;
+        Class*[] _parentClassList;
         string _name;
-        Method[] _methodList;
-        Class[] _nestedClassList;
-        Enum[] _nestedEnumList;
+        Method*[] _methodList;
+        Class*[] _nestedClassList;
+        Enum*[] _nestedEnumList;
         bool _isAbstract;
-
-        @safe pure nothrow
-        this() {}
 
         @safe pure nothrow
         this(string name) {
@@ -534,7 +529,7 @@ public:
          * Returns: A list of parent classes for this class.
          */
         @safe pure nothrow
-        @property inout(Class[]) parentClassList() inout {
+        @property inout(Class*[]) parentClassList() inout {
             return _parentClassList;
         }
 
@@ -542,7 +537,7 @@ public:
          * Returns: A list of classes nested in this class.
          */
         @safe pure nothrow
-        @property inout(Class[]) nestedClassList() inout {
+        @property inout(Class*[]) nestedClassList() inout {
             return _nestedClassList;
         }
 
@@ -550,7 +545,7 @@ public:
          * Returns: A list of enums nested in this class.
          */
         @safe pure nothrow
-        @property inout(Enum[]) nestedEnumList() inout {
+        @property inout(Enum*[]) nestedEnumList() inout {
             return _nestedEnumList;
         }
 
@@ -566,12 +561,12 @@ public:
          * Returns: The list of methods for this class.
          */
         @safe pure nothrow
-        @property inout(Method[]) methodList() inout {
+        @property inout(Method*[]) methodList() inout {
             return _methodList;
         }
     }
 
-    class Enum {
+    struct Enum {
     public:
         struct Pair {
         private:
@@ -597,9 +592,6 @@ public:
     private:
         string _name;
         Pair[] _itemList;
-
-        @safe pure nothrow
-        this() {}
 
         @safe pure nothrow
         this(string name) {
@@ -635,7 +627,7 @@ public:
 
             if (smokeMethod.flags & Smoke.MethodFlags.mf_enum) {
                 // This is an enum value.
-                Enum enm = this.getOrCreateEnum(smoke, smokeMethod.ret);
+                Enum* enm = this.getOrCreateEnum(smoke, smokeMethod.ret);
 
                 enm._itemList ~= Enum.Pair(
                     smoke._methodNames[smokeMethod.name].toSlice.idup,
@@ -648,10 +640,10 @@ public:
                 // This is a class method.
 
                 // Get the class for this method, create it if needed.
-                Class cls = this.getOrCreateClass(smoke, smokeMethod.classID);
+                Class* cls = this.getOrCreateClass(smoke, smokeMethod.classID);
 
                 // Create this method.
-                Method method = this.createMethod(cls, smoke, smokeMethod);
+                Method* method = this.createMethod(cls, smoke, smokeMethod);
 
                 // Add the method to the list of methods in the class.
                 cls._methodList ~= method;
@@ -660,19 +652,19 @@ public:
     }
 private:
     class SmokeMetadata {
-        Class[Smoke.Index] _classMap;
-        Enum[Smoke.Index] _enumMap;
-        Type[Smoke.Index] _typeMap;
+        Class*[Smoke.Index] _classMap;
+        Enum*[Smoke.Index] _enumMap;
+        Type*[Smoke.Index] _typeMap;
     }
 
-    Class[] _topLevelClassList;
-    Enum[] _topLevelEnumList;
-    Type[] _allTypesList;
+    Class*[] _topLevelClassList;
+    Enum*[] _topLevelEnumList;
+    Type*[] _allTypesList;
     SmokeMetadata[Smoke*] _metadataMap;
 
     @trusted pure
     void loadParentClassesIntoClass
-    (Class cls, Smoke* smoke, Smoke.Class* smokeClass) {
+    (Class* cls, Smoke* smoke, Smoke.Class* smokeClass) {
         Smoke.Index inheritanceIndex = smokeClass._parents;
 
         if (inheritanceIndex <= 0) {
@@ -702,10 +694,10 @@ private:
     }
 
     @trusted pure
-    Class getOrCreateClass(Smoke* smoke, Smoke.Index index) {
+    Class* getOrCreateClass(Smoke* smoke, Smoke.Index index) {
         auto metadata = getOrCreateMetadata(smoke);
 
-        Class* ourClassPointer = index in metadata._classMap;
+        Class** ourClassPointer = index in metadata._classMap;
 
         if (ourClassPointer) {
             return *ourClassPointer;
@@ -713,7 +705,7 @@ private:
 
         Smoke.Class* smokeClass = smoke._classes + index;
 
-        Class cls = metadata._classMap[index] = new Class(
+        Class* cls = metadata._classMap[index] = new Class(
             smokeClass.className.toSlice.idup
         );
 
@@ -723,14 +715,14 @@ private:
     }
 
     @trusted pure
-    Type getOrCreateType(Smoke* smoke, Smoke.Index index) {
+    Type* getOrCreateType(Smoke* smoke, Smoke.Index index) {
         if (index == 0) {
             return new Type("void", cast(Smoke.TypeFlags) 1, null);
         }
 
         auto metadata = getOrCreateMetadata(smoke);
 
-        Type* ourTypePointer = index in metadata._typeMap;
+        Type** ourTypePointer = index in metadata._typeMap;
 
         if (ourTypePointer) {
             return *ourTypePointer;
@@ -748,10 +740,10 @@ private:
     }
 
     @trusted pure
-    Enum getOrCreateEnum(Smoke* smoke, Smoke.Index typeIndex) {
+    Enum* getOrCreateEnum(Smoke* smoke, Smoke.Index typeIndex) {
         auto metadata = getOrCreateMetadata(smoke);
 
-        Enum* ourEnumPointer = typeIndex in metadata._enumMap;
+        Enum** ourEnumPointer = typeIndex in metadata._enumMap;
 
         if (ourEnumPointer) {
             return *ourEnumPointer;
@@ -765,8 +757,8 @@ private:
     }
 
     @trusted pure
-    Method createMethod(Class cls, Smoke* smoke, Smoke.Method* smokeMethod) {
-        Method method = new Method();
+    Method* createMethod(Class* cls, Smoke* smoke, Smoke.Method* smokeMethod) {
+        Method* method = new Method();
 
         method._flags = cast(Smoke.MethodFlags) smokeMethod.flags;
         method._name = smoke._methodNames[smokeMethod.name].toSlice.idup;
@@ -793,20 +785,20 @@ private:
      */
     @trusted pure
     void finalize() {
-        Class[string] namedClassMap;
-        Enum[string] namedEnumMap;
-        Method[][string][Class] classMethodMap;
-        bool[Class] abstractCache;
+        Class*[string] namedClassMap;
+        Enum*[string] namedEnumMap;
+        Method*[][string][Class*] classMethodMap;
+        bool[Class*] abstractCache;
 
         @safe nothrow
         bool tryNestInClass(T)(string namespace, T value) {
-            Class* contPtr = namespace in namedClassMap;
+            Class** contPtr = namespace in namedClassMap;
 
             if (contPtr) {
-                static if (is(T == Class)) {
-                    contPtr._nestedClassList ~= value;
-                } else static if (is(T == Enum)) {
-                    contPtr._nestedEnumList ~= value;
+                static if (is(T == Class*)) {
+                    (*contPtr)._nestedClassList ~= value;
+                } else static if (is(T == Enum*)) {
+                    (*contPtr)._nestedEnumList ~= value;
                 } else {
                     static assert(false);
                 }
@@ -818,7 +810,7 @@ private:
         }
 
         @safe pure nothrow
-        bool isReallyPrimitive(const(Type) type) {
+        bool isReallyPrimitive(const(Type*) type) {
             // Check the string first, it can be more reliable.
             switch (type.unqualifiedTypeString) {
             // Some of these are probably never used, but who knows?
@@ -866,13 +858,13 @@ private:
 
         @safe nothrow
         void setFinalMethodFlags
-        (Method method, ref HashSet!Method redundantSet) {
+        (Method* method, ref HashSet!(Method*) redundantSet) {
             if (method._cls._parentClassList.length == 0) {
                 return;
             }
 
             foreach(cls; method._cls._parentClassList) {
-                Method[]* matchListPtr = method.name in classMethodMap[cls];
+                Method*[]* matchListPtr = method.name in classMethodMap[cls];
 
                 if (matchListPtr is null) {
                     // We didn't find any method with this name in the
@@ -900,6 +892,9 @@ private:
                     if (!otherMethod.isVirtual) {
                         // This is supposed to be an override of a non-virtual
                         // method, so that's nonsense. Get rid of it later.
+
+                        static assert(is(typeof(method) == Method*));
+
                         redundantSet.add(method);
                     }
 
@@ -915,10 +910,10 @@ private:
             foreach(_1, cls; metadata._classMap) {
                 namedClassMap[cls.name] = cls;
 
-                Method[][string] methodMap = null;
+                Method*[][string] methodMap = null;
 
                 foreach(method; cls._methodList) {
-                    Method[]* arrayPtr = method.name in methodMap;
+                    Method*[]* arrayPtr = method.name in methodMap;
 
                     if (arrayPtr) {
                         (*arrayPtr) ~= method;
@@ -971,7 +966,7 @@ private:
                     _topLevelClassList ~= cls;
                 }
 
-                HashSet!Method redundantSet;
+                HashSet!(Method*) redundantSet;
 
                 foreach(method; cls._methodList) {
                     setFinalMethodFlags(method, redundantSet);
@@ -987,7 +982,7 @@ private:
                     // We had some redundant methods, so we have to replace
                     // the method list with another which doesn't
                     // contain those redundant methods.
-                    auto newMethodList = new Method[
+                    auto newMethodList = new Method*[
                         cls._methodList.length - redundantSet.length
                     ];
 
@@ -1030,7 +1025,7 @@ public:
      * Returns: The list of top level classes contained in this container.
      */
     @safe pure nothrow
-    @property inout(Class[]) topLevelClassList() inout {
+    @property inout(Class*[]) topLevelClassList() inout {
         return _topLevelClassList;
     }
 
@@ -1038,7 +1033,7 @@ public:
      * Returns: The list of top level enums contained in this container.
      */
     @safe pure nothrow
-    @property inout(Enum[]) topLevelEnumList() inout {
+    @property inout(Enum*[]) topLevelEnumList() inout {
         return _topLevelEnumList;
     }
 
@@ -1046,7 +1041,7 @@ public:
      * Returns: A distinct list of every type known by this container.
      */
     @safe pure nothrow
-    @property inout(Type[]) allTypesList() inout {
+    @property inout(Type*[]) allTypesList() inout {
         return _allTypesList;
     }
 }

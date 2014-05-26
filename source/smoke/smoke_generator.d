@@ -214,12 +214,12 @@ private:
 
     string _moduleName;
     string _loaderName;
-    string[Type] _basicDTypeMap;
-    HashSet!Type _blacklistSet;
-    HashSet!Class _classBlacklistSet;
-    HashSet!Type _importBlacklistSet;
-    string[Type] _inputWrapperMap;
-    string[Type] _outputWrapperMap;
+    string[Type*] _basicDTypeMap;
+    HashSet!(Type*) _blacklistSet;
+    HashSet!(Class*) _classBlacklistSet;
+    HashSet!(Type*) _importBlacklistSet;
+    string[Type*] _inputWrapperMap;
+    string[Type*] _outputWrapperMap;
     immutable(SmokeContainer) _smokeContainer;
 
     this(immutable(SmokeContainer) container) {
@@ -241,7 +241,7 @@ private:
         file.write("}\n");
     }
 
-    void writeOpenClass(ref File file, Class cls, int indent) const {
+    void writeOpenClass(ref File file, Class* cls, int indent) const {
         writeIndent(file, indent);
 
         if (cls.isAbstract) {
@@ -273,7 +273,7 @@ private:
     }
 
     void writeCPPMethodCommentLine
-    (ref File file, Method method, int indent) const {
+    (ref File file, Method* method, int indent) const {
         writeIndent(file, indent);
 
         file.write("// ");
@@ -314,7 +314,7 @@ private:
     }
 
     void writeDType
-    (ref File file, Type type, RemoveRef removeRef) const {
+    (ref File file, Type* type, RemoveRef removeRef) const {
         if (!removeRef
         && type.isReference
         // Don't take primitive types by const ref, we just don't need to
@@ -350,7 +350,7 @@ private:
         file.write(repeat('*').take(pointerCount));
     }
 
-    void writeMethodName(ref File file, Method method) const {
+    void writeMethodName(ref File file, Method* method) const {
         if (method.isConstructor) {
             file.write("this");
             return;
@@ -415,7 +415,7 @@ private:
         }
     }
 
-    void writeOpenMethodPrefix(ref File file, Method method,
+    void writeOpenMethodPrefix(ref File file, Method* method,
     AbstractImpl isAbstractImpl) const {
         if (method.isProtected) {
             file.write("protected ");
@@ -445,7 +445,7 @@ private:
         file.write('(');
     }
 
-    void writeOpenMethodSuffix(ref File file, Method method) const {
+    void writeOpenMethodSuffix(ref File file, Method* method) const {
         file.write(')');
 
         if (method.isConst && !method.isStatic) {
@@ -453,7 +453,7 @@ private:
         }
     }
 
-    void writeOpenMethod(ref File file, Method method, int indent,
+    void writeOpenMethod(ref File file, Method* method, int indent,
     AbstractImpl isAbstractImpl) const {
         // When debugging, print the method signature and everything
         // just like it was in C++.
@@ -482,7 +482,7 @@ private:
     }
 
     void writeMethodBody
-    (ref File file, Method method, size_t methodIndex, int indent) const {
+    (ref File file, Method* method, size_t methodIndex, int indent) const {
         if (method.isConstructor && method.cls.parentClassList.length > 0) {
             // Write the super call at the start of constructors.
             writeSuperLine(file, method.cls, indent);
@@ -655,7 +655,7 @@ private:
      * in every possible combination to make taking r-values just work.
      */
     void writeConstRefOverloads
-    (ref File file, Method method, int indent) const {
+    (ref File file, Method* method, int indent) const {
         size_t[size_t] indexMap;
 
         foreach(index, type; method.argumentTypeList) {
@@ -726,7 +726,7 @@ private:
         }
     }
 
-    void writeOpenEnum(ref File file, Enum enm, int indent) const {
+    void writeOpenEnum(ref File file, Enum* enm, int indent) const {
         writeIndent(file, indent);
         file.writef("enum %s", baseNameCPP(enm.name));
 
@@ -746,7 +746,7 @@ private:
         file.write( "{\n");
     }
 
-    void writeEnum(ref File file, Enum enm, int indent) const {
+    void writeEnum(ref File file, Enum* enm, int indent) const {
         writeOpenEnum(file, enm, indent);
 
         foreach(pair; enm.itemList) {
@@ -757,7 +757,7 @@ private:
         writeClose(file, indent);
     }
 
-    void writeMetaClassName(ref File file, Class cls) const {
+    void writeMetaClassName(ref File file, Class* cls) const {
         file.write("cls_");
 
         foreach(character; cls.name) {
@@ -775,7 +775,7 @@ private:
     }
 
     void writeMethodIndexName
-    (ref File file, size_t index, Method method) const {
+    (ref File file, size_t index, Method* method) const {
         file.write("meth_");
         writeMetaClassName(file, method.cls);
         file.write("_");
@@ -798,7 +798,7 @@ private:
 
     enum AbstractImpl { no, yes }
 
-    void writeStaticDeclarations(ref File file, Class cls) const {
+    void writeStaticDeclarations(ref File file, Class* cls) const {
         if (cls.methodList.length > 0) {
             foreach(index, method; cls.methodList) {
                 if (isBlacklisted(method)) {
@@ -821,7 +821,7 @@ private:
         }
     }
 
-    void writeStaticAssignments(ref File file, Class cls) const {
+    void writeStaticAssignments(ref File file, Class* cls) const {
         if (cls.methodList.length > 0) {
             writeIndent(file, 1);
             // Write the class loader.
@@ -857,13 +857,13 @@ private:
         }
     }
 
-    void writeSuperLine(ref File file, Class cls, int indent) const {
+    void writeSuperLine(ref File file, Class* cls, int indent) const {
         writeIndent(file, indent);
         file.write("super(Nothing.init);\n");
     }
 
     void writeSpecialMethods
-    (ref File file, Class cls, int indent, AbstractImpl isAbstractImpl) const {
+    (ref File file, Class* cls, int indent, AbstractImpl isAbstractImpl) const {
         // Write a do nothing constructor for the benefit of skipping
         // constructors in subclasses.
         file.write('\n');
@@ -910,14 +910,14 @@ private:
         file.write("}\n");
     }
 
-    void writeAbstractClassImpl(ref File file, Class cls, int indent) const {
+    void writeAbstractClassImpl(ref File file, Class* cls, int indent) const {
         writeIndent(file, indent);
 
         file.write("package final static class Impl : this {\n");
 
         writeSpecialMethods(file, cls, indent + 1, AbstractImpl.yes);
 
-        void writeAbstractMethodFromClass(Class cls) {
+        void writeAbstractMethodFromClass(Class* cls) {
             foreach(index, method; cls.methodList) {
                 if (isBlacklisted(method) || !method.isAbstract) {
                     continue;
@@ -943,7 +943,7 @@ private:
         file.write("}\n");
     }
 
-    void writeClass(ref File file, Class cls, int indent) const {
+    void writeClass(ref File file, Class* cls, int indent) const {
         if (isBlacklisted(cls)) {
             return;
         }
@@ -997,10 +997,10 @@ private:
         writeClose(file, indent);
     }
 
-    void writeImports(ref File file, Class cls) const {
+    void writeImports(ref File file, Class* cls) const {
         HashSet!string nameSet;
 
-        void considerType(Type type) {
+        void considerType(Type* type) {
             if (type.isPrimitive) {
                 return;
             }
@@ -1013,7 +1013,7 @@ private:
             nameSet.add(topNameD(_basicDTypeMap[type]));
         }
 
-        void searchForTypesInMethod(Method method) {
+        void searchForTypesInMethod(Method* method) {
             if (isBlacklisted(method)) {
                 // If the method is not going to be generated, we shouldn't
                 // consider any types from it for imports at all.
@@ -1027,7 +1027,7 @@ private:
             }
         }
 
-        void searchForTypesInClass(Class cls) {
+        void searchForTypesInClass(Class* cls) {
             foreach(method; cls.methodList) {
                 searchForTypesInMethod(method);
             }
@@ -1047,7 +1047,7 @@ private:
             }
         }
 
-        void removeClassesDefinedHere(Class cls) {
+        void removeClassesDefinedHere(Class* cls) {
             nameSet.remove(topNameD(cls.name));
 
             foreach(nestedClass; cls.nestedClassList) {
@@ -1071,7 +1071,7 @@ private:
             cls.name.toLowerASCII
         );
 
-        foreach(name; nameSet) {
+        foreach(name; nameSet.entries) {
             file.writef("import %s.%s;\n", _moduleName, name.toLowerASCII);
         }
 
@@ -1081,7 +1081,7 @@ private:
     }
 
     @safe pure nothrow
-    string inputWrapper(Type type) const {
+    string inputWrapper(Type* type) const {
         auto strPtr = type in _inputWrapperMap;
 
         if (strPtr) {
@@ -1092,7 +1092,7 @@ private:
     }
 
     @safe pure nothrow
-    string outputWrapper(Type type) const {
+    string outputWrapper(Type* type) const {
         auto strPtr = type in _outputWrapperMap;
 
         if (strPtr) {
@@ -1102,7 +1102,7 @@ private:
         return "";
     }
 
-    bool isBlacklisted(Class cls) const {
+    bool isBlacklisted(Class* cls) const {
         if (cls in _classBlacklistSet) {
             return true;
         }
@@ -1118,7 +1118,7 @@ private:
         return false;
     }
 
-    bool isBlacklisted(Method method) const {
+    bool isBlacklisted(Method* method) const {
         if (isBlacklisted(method.returnType)) {
             return true;
         }
@@ -1137,7 +1137,7 @@ private:
         return false;
     }
 
-    bool isBlacklisted(Type type) const {
+    bool isBlacklisted(Type* type) const {
         if (type.cls !is null && isBlacklisted(type.cls)) {
             return true;
         }
@@ -1146,7 +1146,7 @@ private:
     }
 
     @safe pure nothrow
-    bool isImportBlacklisted(Type type) const {
+    bool isImportBlacklisted(Type* type) const {
         return type in _importBlacklistSet;
     }
 
@@ -1250,7 +1250,7 @@ public:
         foreach(entry; dirEntries(sourceDirectory, SpanMode.shallow)) {
             if (isFile(entry)
             && entry.name.endsWith(".d") || entry.name.endsWith(".cpp")) {
-                copy(entry, buildPath(directory, baseName(entry)));
+                copy(entry, buildPath(directory, baseName(entry.name)));
             }
         }
     }
@@ -1269,14 +1269,14 @@ struct SmokeGeneratorBuilder {
      * This delegate will be called if set to produce a mapping from
      * from types to strings as they should be written in D.
      */
-    string delegate(Type type) basicDTypeFunc;
+    string delegate(Type* type) basicDTypeFunc;
 
     /**
      * This delegate will be called if set to blacklist types.
      *
      * No methods will be generated which mention a blacklisted type.
      */
-    bool delegate(Type type) blacklistFunc;
+    bool delegate(Type* type) blacklistFunc;
 
     /**
      * This delegate will be called if set to blacklist classes.
@@ -1287,7 +1287,7 @@ struct SmokeGeneratorBuilder {
      *
      * This should only be used when SMOKE just generates rubbish for a class.
      */
-    bool delegate(Class cls) classBlacklistFunc;
+    bool delegate(Class* cls) classBlacklistFunc;
 
     /**
      * This delegate will be called if set to generate the names
@@ -1302,7 +1302,7 @@ struct SmokeGeneratorBuilder {
      *
      * The wrapper should return an empty string to ignore the type.
      */
-    string delegate(Type type) inputWrapperFunc;
+    string delegate(Type* type) inputWrapperFunc;
 
     /**
      * This delegate will be called if set to generate the names
@@ -1313,7 +1313,7 @@ struct SmokeGeneratorBuilder {
      *
      * The wrapper should return an empty string to ignore the type.
      */
-    string delegate(Type type) outputWrapperFunc;
+    string delegate(Type* type) outputWrapperFunc;
 
     /**
      * This delegate will be called if set to exclude types from having
@@ -1321,7 +1321,7 @@ struct SmokeGeneratorBuilder {
      * be responsible for dealing with the types in some other way,
      * perhaps by replacing them with native D types and custom wrappers.
      */
-    bool delegate(Type type) importBlacklistFunc;
+    bool delegate(Type* type) importBlacklistFunc;
 
     /**
      * Returns: The module name currently set for this generator.
@@ -1402,13 +1402,13 @@ struct SmokeGeneratorBuilder {
         // Now we need to run through every class and do something similar
         // to what we did for our types.
 
-        void setupClass(Class cls) {
+        void setupClass(Class* cls) {
             if (classBlacklistFunc !is null && classBlacklistFunc(cls)) {
                 generator._classBlacklistSet.add(cls);
             }
         }
 
-        void setupClassAndNested(Class cls) {
+        void setupClassAndNested(Class* cls) {
             setupClass(cls);
 
             foreach(nestedClass; cls.nestedClassList) {
