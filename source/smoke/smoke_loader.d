@@ -6,7 +6,6 @@ import std.typecons;
 import std.stdio;
 
 import dstruct.weak_reference;
-import dstruct.map;
 
 import smoke.smoke;
 import smoke.smoke_util;
@@ -74,7 +73,13 @@ private:
 
     pure @safe nothrow
     void addMethod(string methodName, const(Smoke.Method*) method) {
-        _overloadedMethodMap.setDefault(methodName) ~= method;
+        auto ptr = methodName in _overloadedMethodMap;
+
+        if (ptr) {
+            *ptr ~= method;
+        } else {
+            _overloadedMethodMap[methodName] = [method];
+        }
     }
 
     pure @safe nothrow
@@ -220,7 +225,7 @@ public:
 }
 
 private WeakReference!(const(Object))[const(void*)] _weakMap;
-private const(Object)[const(void*)] _strongMap;
+private Object[const(void*)] _strongMap;
 
 /**
  * Given a pointer to some C++ class and a D class,
@@ -288,7 +293,7 @@ in {
     assert(object !is null, "null D class reference");
     assert(ptr !in _strongMap, "Added pointer mapping twice!");
 } body {
-    _strongMap[ptr] = object;
+    _strongMap[ptr] = cast(Object) object;
 }
 
 struct SmokeLoader {
@@ -321,11 +326,25 @@ private:
                 continue;
             }
 
-            // get/create class data for the class for this method.
-            ClassLoader classData = _classMap.setDefault(className,
-                // Skip to the class pointer directly.
-                new ClassLoader(smoke, smoke._classes + meth.classID, meth.classID)
-            );
+            ClassLoader classData;
+
+            {
+                auto ptr = className in _classMap;
+
+                if (ptr) {
+                    classData = *ptr;
+                } else {
+                    // Skip to the class pointer directly.
+                    classData = new ClassLoader(
+                        smoke,
+                        smoke._classes + meth.classID,
+                        meth.classID
+                    );
+
+                    // Save the class loader in the map for later.
+                    _classMap[className] = classData;
+                }
+            }
 
             string methodName = methNameList[meth.name].toSlice.idup;
 
@@ -342,11 +361,11 @@ public:
             loader.loadClassMethodData(smoke);
         }
 
-        // FIXME: This cast shouldn't be needed.
         return cast(immutable) loader;
     }
 
-    @disable this(this);
+    // FIXME: Copying had to be enabled, as cast(immutable) was creating a copy.
+    ///@disable this(this);
 
     pure @trusted
     immutable(ClassLoader) findClass(string className) const {

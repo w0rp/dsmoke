@@ -5,9 +5,6 @@ import std.array;
 import std.exception;
 import std.functional;
 
-import dstruct.support;
-import dstruct.set;
-
 import smoke.smoke;
 import smoke.smoke_util;
 import smoke.string_util : toSlice;
@@ -31,7 +28,7 @@ private long loadEnumValue(Smoke* smoke, Smoke.Method* smokeMethod) {
     return stack[0].s_long;
 }
 
-@trusted
+@trusted pure
 private string namespaceForName(string name) {
     auto parts = name.split("::");
 
@@ -858,7 +855,7 @@ private:
 
         @safe nothrow
         void setFinalMethodFlags
-        (Method* method, ref HashSet!(Method*) redundantSet) {
+        (Method* method, ref void[0][Method*] redundantSet) {
             if (method._cls._parentClassList.length == 0) {
                 return;
             }
@@ -895,7 +892,7 @@ private:
 
                         static assert(is(typeof(method) == Method*));
 
-                        redundantSet.add(method);
+                        redundantSet[method] = (void[0]).init;
                     }
 
                     // We got this far, it's definitely a match.
@@ -966,7 +963,7 @@ private:
                     _topLevelClassList ~= cls;
                 }
 
-                HashSet!(Method*) redundantSet;
+                void[0][Method*] redundantSet;
 
                 foreach(method; cls._methodList) {
                     setFinalMethodFlags(method, redundantSet);

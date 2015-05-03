@@ -9,8 +9,6 @@ import std.algorithm;
 import std.range;
 import std.parallelism;
 
-import dstruct.set;
-
 import smoke.smoke_container;
 import smoke.string_util;
 
@@ -215,14 +213,14 @@ private:
     string _moduleName;
     string _loaderName;
     string[Type*] _basicDTypeMap;
-    HashSet!(Type*) _blacklistSet;
-    HashSet!(Class*) _classBlacklistSet;
-    HashSet!(Type*) _importBlacklistSet;
+    void[0][Type*] _blacklistSet;
+    void[0][Class*] _classBlacklistSet;
+    void[0][Type*] _importBlacklistSet;
     string[Type*] _inputWrapperMap;
     string[Type*] _outputWrapperMap;
     immutable(SmokeContainer) _smokeContainer;
 
-    this(immutable(SmokeContainer) container) {
+    this(immutable(SmokeContainer) container) pure {
         _smokeContainer = container;
     }
 
@@ -998,7 +996,7 @@ private:
     }
 
     void writeImports(ref File file, Class* cls) const {
-        HashSet!string nameSet;
+        void[0][string] nameSet;
 
         void considerType(Type* type) {
             if (type.isPrimitive) {
@@ -1010,7 +1008,7 @@ private:
             }
 
             // Add this one to the set.
-            nameSet.add(topNameD(_basicDTypeMap[type]));
+            nameSet[topNameD(_basicDTypeMap[type])] = (void[0]).init;
         }
 
         void searchForTypesInMethod(Method* method) {
@@ -1034,7 +1032,7 @@ private:
 
             foreach(parentClass; cls.parentClassList) {
                 // Add this one to the set.
-                nameSet.add(topNameD(parentClass.name));
+                nameSet[topNameD(parentClass.name)] = (void[0]).init;
             }
 
             foreach(nestedClass; cls.nestedClassList) {
@@ -1071,7 +1069,7 @@ private:
             cls.name.toLowerASCII
         );
 
-        foreach(name; nameSet.entries) {
+        foreach(name, _; nameSet) {
             file.writef("import %s.%s;\n", _moduleName, name.toLowerASCII);
         }
 
@@ -1142,12 +1140,12 @@ private:
             return true;
         }
 
-        return type in _blacklistSet;
+        return (type in _blacklistSet) !is null;
     }
 
     @safe pure nothrow
     bool isImportBlacklisted(Type* type) const {
-        return type in _importBlacklistSet;
+        return (type in _importBlacklistSet) !is null;
     }
 
     void writeModuleLine(ref File file, string baseName) const {
@@ -1157,8 +1155,8 @@ public:
     /// Default init for this object does not make sense.
     @disable this();
 
-    /// This object is non-copyable.
-    @disable this(this);
+    // FIXME: Copying had to be enabled, as cast(immutable) was creating a copy.
+    //@disable this(this);
 
     /**
      * Output the generated D source files to a given directory, copying
@@ -1375,7 +1373,7 @@ struct SmokeGeneratorBuilder {
             generator._basicDTypeMap[type] = basicDTypeFunc(type);
 
             if (blacklistFunc !is null && blacklistFunc(type)) {
-                generator._blacklistSet.add(type);
+                generator._blacklistSet[type] = (void[0]).init;
             }
 
             if (inputWrapperFunc !is null) {
@@ -1395,7 +1393,7 @@ struct SmokeGeneratorBuilder {
             }
 
             if (importBlacklistFunc !is null && importBlacklistFunc(type)) {
-                generator._importBlacklistSet.add(type);
+                generator._importBlacklistSet[type] = (void[0]).init;
             }
         }
 
@@ -1404,7 +1402,7 @@ struct SmokeGeneratorBuilder {
 
         void setupClass(Class* cls) {
             if (classBlacklistFunc !is null && classBlacklistFunc(cls)) {
-                generator._classBlacklistSet.add(cls);
+                generator._classBlacklistSet[cls] = (void[0]).init;
             }
         }
 
