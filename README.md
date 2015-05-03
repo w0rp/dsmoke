@@ -8,7 +8,8 @@ generated SMOKE libraries.
 
 ## Quick Start
 
-Check out the code somewhere, with the *dstruct* code in the same parent directory if you don't have it and use DUB to build the library.
+Check out the code somewhere, with the *dstruct* code in the same parent directory if you don't have it and use DUB to build the
+library.
 
 ```
 dub build
