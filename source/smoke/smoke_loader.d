@@ -296,6 +296,10 @@ in {
     _strongMap[ptr] = cast(Object) object;
 }
 
+/**
+ * This struct is used in generated SMOKE code for loading the smoke classes
+ * and methods in the wrapper classes.
+ */
 struct SmokeLoader {
 private:
     ClassLoader[string] _classMap;
@@ -365,13 +369,37 @@ public:
     }
 
     // FIXME: Copying had to be enabled, as cast(immutable) was creating a copy.
-    ///@disable this(this);
+    //@disable this(this);
 
-    pure @trusted
+    /**
+     * Find a class by name, for loading its methods, etc.
+     *
+     * Params:
+     * className = The class name.
+     *
+     * Returns: The class loader, or null if the class was not found.
+     */
+    pure @system nothrow
     immutable(ClassLoader) findClass(string className) const {
-        return cast(immutable) _classMap.get(className, null);
+        auto ptr = className in _classMap;
+
+        if (ptr is null) {
+            return null;
+        }
+
+        return ptr !is null ? cast(immutable) *ptr : null;
     }
 
+    /**
+     * Find a class by name, and throw an exception if the class cannot
+     * be loaded.
+     *
+     * Params:
+     * className = The class name.
+     *
+     * Returns: The class loader.
+     * Throws: An error if the class cannot be loaded.
+     */
     pure @trusted
     immutable(ClassLoader) demandClass(string className) const {
         import std.exception;
