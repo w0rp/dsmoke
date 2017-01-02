@@ -1177,7 +1177,7 @@ public:
             mkdir(directory);
         } else if (cleanBuildDirectory) {
             foreach(entry; dirEntries(directory, SpanMode.shallow)) {
-                if (!isDir(entry)) {
+                if (!entry.isDir) {
                     remove(entry);
                 }
             }
