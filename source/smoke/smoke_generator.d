@@ -886,7 +886,9 @@ private:
             writeSuperLine(file, cls, indent + 1);
         }
 
+        writeIndent(file, indent + 1);
         file.write("_flags = flags;\n");
+        writeIndent(file, indent + 1);
         file.write("_data = data;\n");
 
         // Keep a weak reference to this new wrapper object we are
@@ -899,7 +901,7 @@ private:
         file.write("}\n");
 
         writeIndent(file, indent);
-        file.write("@system void disableGC() {\n");
+        file.write("override @system void disableGC() {\n");
 
         writeIndent(file, indent + 1);
         file.write("storeStrongSmokeMapping(_data, this); \n");
